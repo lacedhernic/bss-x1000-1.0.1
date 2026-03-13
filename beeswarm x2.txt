@@ -1,0 +1,331 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local remotes = ReplicatedStorage:WaitForChild("remoteEvents")
+local functions = ReplicatedStorage:WaitForChild("remoteFunctions")
+
+WindUI:AddTheme({Name="x", Accent=Color3.fromHex("#18181b"), Background=Color3.fromHex("#231d3b"), Outline=Color3.fromHex("#FFF"), Text=Color3.fromHex("#FFF"), Placeholder=Color3.fromHex("#7a7a7a"), Button=Color3.fromHex("#52525b"), Icon=Color3.fromHex("#a1a1aa")})
+local window = WindUI:CreateWindow({Title="Nicotine Hub", Icon="https://raw.githubusercontent.com/xy3rxlol/xy3rxlol/refs/heads/main/visualsafsde%20(1)%20(1).png", Author="by rio", Size=UDim2.fromOffset(850,560), Transparent=true, Theme="x"})
+WindUI:SetTheme("x")
+window:SetToggleKey(Enum.KeyCode.H)
+window:EditOpenButton({Title="Nicotine Addiction", Icon="https://raw.githubusercontent.com/xy3rxlol/xy3rxlol/refs/heads/main/visualsafsde%20(1)%20(1).png", CornerRadius=UDim.new(0.32,0), StrokeThickness=2, Color=ColorSequence.new(Color3.fromHex("#5942be"), Color3.fromHex("#a686fc")), OnlyMobile=false, Enabled=true, Draggable=true})
+window:Tag({Title="1.0.1", Icon="code-xml", Color=Color3.fromHex("#30ff6a"), Radius=13})
+window:Tag({Title="BSSM: Universal", Icon="scroll", Color=Color3.fromHex("#fffd7c"), Radius=13})
+print("Why u using Rios script tho")
+local config = { 
+    active = false, 
+    chaosMode = false,
+    rgbEnabled = false,
+    spinEnabled = false
+}
+
+local driveTargets = {
+    ["Red Drive"] = "RedDrive",
+    ["White Drive"] = "WhiteDrive",
+    ["Blue Drive"] = "BlueDrive",
+    ["Glitched Drive"] = "GlitchedDrive"
+}
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local SpeedValue = 28
+local AntiDriftConnection
+
+-- SPEED TAB
+local speedTab = window:Tab({ Title = "Speed", Icon = "zap" })
+
+speedTab:Section({ Title = "Movement" })
+
+speedTab:Slider({
+    Title = "Speed Modifier",
+    Value = {
+        Min = 0,
+        Max = 100,
+        Default = 28
+    },
+    Callback = function(value)
+        SpeedValue = value
+
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = SpeedValue
+        end
+    end
+})
+
+-- Anti Drift
+if AntiDriftConnection then
+    AntiDriftConnection:Disconnect()
+end
+
+AntiDriftConnection = RunService.Heartbeat:Connect(function()
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local humanoid = player.Character.Humanoid
+        if humanoid.WalkSpeed ~= SpeedValue then
+            humanoid.WalkSpeed = SpeedValue
+        end
+    end
+end)
+
+-- Reapply speed on respawn
+player.CharacterAdded:Connect(function(character)
+    task.wait(1)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = SpeedValue
+    end
+end)
+
+-- MAX SPEED: Non-blocking drive spam
+local function fastDriveSpam()
+    local driveNames = {"Red Drive", "White Drive", "Blue Drive", "Glitched Drive"}
+    for _ = 1, 5 do 
+        for _, name in ipairs(driveNames) do
+            task.spawn(function()
+                functions.PlayerActivesCommand:InvokeServer({ Name = name })
+            end)
+        end
+        task.wait() 
+    end
+end
+
+local function getInventoryCount(driveName)
+    local screenGui = player.PlayerGui:FindFirstChild("ScreenGui")
+    local eggRows = screenGui and screenGui:FindFirstChild("EggRows", true)
+    if not eggRows then return 0 end
+    
+    for _, row in ipairs(eggRows:GetChildren()) do
+        local typeLabel = row:FindFirstChild("TypeName")
+        if typeLabel and typeLabel.Text == driveName then
+            local countText = row:FindFirstChild("EggSlot") and row.EggSlot:FindFirstChild("Count") and row.EggSlot.Count.Text
+            return tonumber(countText:match("(%d+)/")) or 0
+        end
+    end
+    return 0
+end
+
+local function checkDigitalBee()
+    local prompt = player.PlayerGui.ScreenGui:FindFirstChild("RoboBearPrompt")
+    if not (prompt and prompt.Visible) then return nil end
+    local btnFrame = prompt:FindFirstChild("ButtonFrame", true)
+    for i = 1, 3 do
+        local btn = btnFrame and btnFrame:FindFirstChild("Button" .. i)
+        if btn and btn:FindFirstChild("Text1") and string.find(btn.Text1.Text, "★ Digital Bee") then
+            return i
+        end
+    end
+    return nil
+end
+
+local function startAutomation()
+    while config.active do
+        -- 1. HYPER RESTOCK (No waits between start/quit)
+        for displayName, technicalName in pairs(driveTargets) do
+            while getInventoryCount(displayName) < 5 and config.active do
+                remotes.SelectNPCOption:FireServer("StartRoboBearChallenge")
+                remotes.roboBearChallenge:FireServer("start")
+                remotes.roboBearChallenge:FireServer("quit")
+                
+                -- Spawn the purchase so it doesn't wait for server response
+                task.spawn(function()
+                    functions.ItemPackageEvent:InvokeServer("Purchase", {
+                        ["Type"] = technicalName,
+                        ["Category"] = "Eggs",
+                        ["Amount"] = 1
+                    })
+                end)
+                
+                task.wait(0.01) -- Bare minimum to avoid server rate limit
+            end
+        end
+
+        -- 2. OPTIMIZED SNIPE
+        if config.active then
+            remotes.SelectNPCOption:FireServer("StartRoboBearChallenge")
+            task.wait() -- Minimal wait for menu
+            remotes.roboBearChallenge:FireServer("selectQuest", 1)
+            task.wait()
+
+            local found = false
+            for i = 0, 6 do
+                local beeIndex = checkDigitalBee()
+                if beeIndex then
+                    remotes.roboBearChallenge:FireServer("selectBee", beeIndex)
+                    remotes.roboBearChallenge:FireServer("start")
+                    
+                    task.wait(0.01) -- Fast transition to spam
+                    fastDriveSpam() 
+                    
+                    task.wait(0.3) -- Tight buffer for drive registration
+                    remotes.roboBearChallenge:FireServer("quit")
+                    found = true
+                    break
+                end
+                
+                if i < 6 then
+                    -- Keeping reroll speed same as per request (0.1s)
+                    remotes.roboBearChallenge:FireServer("reroll")
+                    task.wait(0.1) 
+                end
+            end
+            if not found then remotes.roboBearChallenge:FireServer("quit") end
+        end
+        task.wait(0.01)
+    end
+end
+
+local mainTab = window:Tab({ Title = "Main", Icon = "rbxassetid://10734950309" })
+local extraTab = window:Tab({ Title = "Chaos & Fun", Icon = "sparkles" })
+
+local config = { 
+    active = false, 
+    chaosMode = false,
+    rgbEnabled = false,
+    spinEnabled = false
+}
+
+--- [ CHAOS LOGIC ] ---
+
+-- Mob Stacker: This fires the 'Start' remote in a tight loop without 'Quit'
+-- WARNING: This may crash low-end PCs or trigger server-side lag.
+local function mobStacker()
+    while config.chaosMode do
+        -- We don't fire "Quit" here. We just keep asking the server to start.
+        remotes.SelectNPCOption:FireServer("StartRoboBearChallenge")
+        remotes.roboBearChallenge:FireServer("start")
+        task.wait(0.01) -- High-frequency firing
+    end
+end
+
+-- RGB UI Logic
+task.spawn(function()
+    while true do
+        if config.rgbEnabled then
+            local hue = tick() % 5 / 5
+            local color = Color3.fromHSV(hue, 1, 1)
+            -- Note: WindUI might require specific methods to update accent live
+            -- This is a placeholder for the logic
+        end
+        task.wait()
+    end
+end)
+
+--- [ TABS & TOGGLES ] ---
+
+-- EXTRA TAB
+extraTab:Section({ Title = "Experimental" })
+
+extraTab:Toggle({
+    Title = "Mob Stacker (Chaos Mode)",
+    Callback = function(state)
+        config.chaosMode = state
+        if state then 
+            task.spawn(mobStacker) 
+            WindUI:Notify({Title = "Chaos", Content = "Attempting to stack mob spawns...", Type = "Warning"})
+        end
+    end
+})
+
+extraTab:Section({ Title = "Visuals & Fun" })
+
+extraTab:Toggle({
+    Title = "Character Spin",
+    Callback = function(state)
+        config.spinEnabled = state
+        task.spawn(function()
+            while config.spinEnabled do
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(20), 0)
+                end
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end
+})
+
+extraTab:Button({
+    Title = "Invisible Character (Client-Side)",
+    Callback = function()
+        for _, part in ipairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = part.Transparency == 1 and 0 or 1
+            end
+        end
+    end
+})
+
+-- MAIN TAB (Your Existing Loop)
+mainTab:Toggle({
+    Title = "Auto farm drives",
+    Callback = function(state)
+        config.active = state
+        if state then task.spawn(startAutomation) end -- startAutomation logic from previous steps
+    end
+})
+
+-- UI Management
+local roboPrompt = player.PlayerGui.ScreenGui:FindFirstChild("RoboBearPrompt")
+local hideConnection
+mainTab:Toggle({
+    Title = "Hide Robo Prompt",
+    Callback = function(state)
+        if state and roboPrompt then
+            roboPrompt.MainFrame.Visible = false
+            roboPrompt.BackgroundTransparency = 1
+            hideConnection = roboPrompt:GetPropertyChangedSignal("Visible"):Connect(function()
+                if roboPrompt.MainFrame.Visible then
+                    roboPrompt.MainFrame.Visible = false
+                    roboPrompt.BackgroundTransparency = 1
+                end
+            end)
+        elseif hideConnection then
+            hideConnection:Disconnect()
+            if roboPrompt then
+                roboPrompt.MainFrame.Visible = true
+                roboPrompt.BackgroundTransparency = 0.25
+            end
+        end
+    end
+})
+
+-- CHAOS TAB ADDITIONS --
+extraTab:Section({ Title = "Entity Manipulation" })
+
+local mobMultiplierActive = false
+extraTab:Toggle({
+    Title = "Mob Multiplier (Ghost Loop)",
+    Callback = function(state)
+        mobMultiplierActive = state
+        if state then
+            task.spawn(function()
+                while mobMultiplierActive do
+                    -- Step 1: Initialize Challenge
+                    remotes.SelectNPCOption:FireServer("StartRoboBearChallenge")
+                    
+                    -- Step 2: Force Start
+                    remotes.roboBearChallenge:FireServer("start")
+                    
+                    -- We wait the absolute minimum time (1 frame) 
+                    -- to let the server register the "Start"
+                    RunService.Heartbeat:Wait()
+                    
+                    -- Step 3: Instant Quit
+                    -- The goal is to quit before the server attaches the 
+                    -- "Despawn on End" tag to the mobs.
+                    remotes.roboBearChallenge:FireServer("quit")
+                    
+                    -- Short delay to prevent the game from kicking you for spam
+                    task.wait(0.05) 
+                end
+            end)
+            WindUI:Notify({
+                Title = "Ghost Loop Active",
+                Content = "Spamming Start/Quit. Watch for persistent mobs.",
+                Type = "Info"
+            })
+        end
+    end
+})
